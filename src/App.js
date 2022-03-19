@@ -11,9 +11,9 @@ import AdapterDateFns from '@mui/lab/AdapterDateFns';
 import LocalizationProvider from '@mui/lab/LocalizationProvider';
 import DatePicker from '@mui/lab/DatePicker';
 import db from './firebase.config'
-import { onValue, ref, set, push, remove } from  'firebase/database';
-import './App.css';
+import { onValue, ref, set, push, remove, onChildChanged, onChildRemoved, onChildAdded } from  'firebase/database';
 import { parseISO } from 'date-fns';
+import './App.css';
 
 const todoListRef = ref(db, 'todos')
 const todoListItemRef = key => ref(db, 'todos/' + key)
@@ -21,6 +21,7 @@ const todoListItemRef = key => ref(db, 'todos/' + key)
 function App() {
   const [todo, setTodo] = useState({ key: null, title: '', date: null, completed: false, editing: false });
   const [todoList, setTodoList] = useState([]);
+  const [changedTodos, setChangedTodos] = useState([]);
 
   useEffect(() => {
     onValue(todoListRef, snapshot => {
@@ -33,6 +34,21 @@ function App() {
 
       setTodoList(todos)
     } )
+
+    onChildChanged(todoListRef, snapshot => {
+      const todoChanged = { key: snapshot.key, ...snapshot.val(), action: 'changed' }
+      setChangedTodos([ ...changedTodos, todoChanged ])
+    })
+
+    onChildRemoved(todoListRef, snapshot => {
+      const todoRemoved = { key: snapshot.key, ...snapshot.val(), action: 'removed' }
+      setChangedTodos([ ...changedTodos, todoRemoved ])
+    })
+
+    onChildAdded(todoListRef, snapshot => {
+      const todoAdded = { key: snapshot.key, ...snapshot.val(), action: 'added' }
+      setChangedTodos([ ...changedTodos, todoAdded ])
+    })
   }, [])
 
   function saveTodo() {
@@ -94,7 +110,7 @@ function App() {
       <List>
         {
           todoList.map((todo, index) => (
-            <ListItem key={index}>
+            <ListItem key={todo.key}>
               <ListItemInfo>
                 <span>{todo.title}</span>
                 <span>{todo.date.toLocaleString()}</span>
@@ -105,6 +121,13 @@ function App() {
                 <Button onClick={() => deleteTodo(todo)}>Delete</Button>
               </ListItemButtons>
             </ListItem>
+          ))
+        }
+      </List>
+      <List>
+        {
+          changedTodos.map((todo, index) => (
+            <span key={index}>History: { todo.title } { todo.action }</span>
           ))
         }
       </List>
